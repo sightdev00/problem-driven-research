@@ -1,0 +1,15 @@
+# Research data and local settings stay private by default.
+.env
+*.pyc
+__pycache__/
+research/*/progress.json
+research/*/sources.json
+research/*/draft.json
+research/*/analysis.json
+research/*/analysis_chunks.json
+research/*/decisions.jsonl
+research/*/problem.json
+research/*/reports/
+research/*/inputs/
+research/*/rounds/
+research/.trash/

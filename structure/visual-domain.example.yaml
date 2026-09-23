@@ -1,0 +1,11 @@
+# 领域协议示意；字段与执行行为尚未实现。
+id: visual-intelligence
+version: draft-1
+scope:
+  include: [computer_vision, vision_language, imaging, annotation, evaluation, visual_deployment]
+  exclude: [general_llm, general_agent]
+check_mechanisms: [sensing, preprocessing, sampling, annotation, model, postprocessing, system_decision]
+evidence_questions:
+  - 原始问题与论文的任务和评价指标是否一致？
+  - 方法收益能否区分尺度、上下文与数据差异？
+  - 结论适用于哪些设备和场景？

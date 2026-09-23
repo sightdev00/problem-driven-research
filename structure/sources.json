@@ -1,0 +1,38 @@
+{
+  "version": "draft-1",
+  "sources": [
+    {
+      "id": "openalex",
+      "kind": "scholarly_index",
+      "domains": ["visual-intelligence", "physics"],
+      "enabled": true,
+      "purpose": "跨学科论文元数据与索引摘要"
+    },
+    {
+      "id": "crossref",
+      "kind": "scholarly_index",
+      "domains": ["visual-intelligence", "physics"],
+      "enabled": true,
+      "purpose": "DOI 书目信息与部分登记摘要"
+    },
+    {
+      "id": "arxiv",
+      "kind": "preprint_index",
+      "domains": ["physics"],
+      "enabled": true,
+      "purpose": "物理理论预印本摘要；不等同于同行评审证据"
+    },
+    {
+      "id": "china_physics_institutes",
+      "kind": "curated_web",
+      "domains": ["physics"],
+      "enabled": true,
+      "purpose": "国内理论物理机构的公开研究方向与动态；作为背景与团队线索，不替代原始论文",
+      "urls": [
+        "https://itp.cas.cn/kxyj/yjfx/",
+        "https://itp.pku.edu.cn/yjly/cl_cxyyzx.htm",
+        "https://www.ihep.cas.cn/xwdt2022/gnxw/hotnews/2014/202105/t20210518_6018362.html"
+      ]
+    }
+  ]
+}

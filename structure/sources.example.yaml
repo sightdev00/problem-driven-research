@@ -1,0 +1,7 @@
+# 来源示意；真实种子由人维护，不能将网址命中当作证据。
+sources:
+  - name: CVF Open Access
+    url: https://openaccess.thecvf.com/
+    origin: curated
+    required: true
+    reason: 视觉领域会议论文入口

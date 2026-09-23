@@ -1,0 +1,11 @@
+# 物理理论研究领域协议示意；字段与执行行为由首轮研究流程实现。
+id: physics
+version: draft-1
+scope:
+  include: [theoretical_physics, quantum_gravity, quantum_field_theory, cosmology, condensed_matter_theory]
+  exclude: [unattributed_speculation, unsupported_breakthrough_claims]
+check_mechanisms: [definitions, assumptions, symmetries, derivations, approximations, limits, observables, evidence, open_problems]
+evidence_questions:
+  - 原始现象中的“进展”是否有可定位的论文、预印本或权威综述支持？
+  - 结论属于严格推导、数值结果、猜想、对偶性线索还是实验/观测约束？
+  - 理论的适用范围、近似条件与已知反例是什么？

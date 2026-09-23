@@ -1,0 +1,10 @@
+# 工程仓库能力说明示意；不得直接用于执行。
+repository: replace-with-real-repository
+revision: replace-with-git-commit
+capabilities:
+  - name: evaluate
+    entrypoint: replace-with-verified-command
+    required_inputs: [dataset_path, weights_path, output_path]
+    expected_outputs: [metrics_file, predictions_file]
+    environment: replace-with-real-environment
+    limitations: [must_verify_on_real_repository]
