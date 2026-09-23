@@ -1,6 +1,8 @@
 # Research data and local settings stay private by default.
 .env
+.envrc
 *.pyc
+*.pyo
 __pycache__/
 research/*/progress.json
 research/*/sources.json
@@ -13,3 +15,29 @@ research/*/reports/
 research/*/inputs/
 research/*/rounds/
 research/.trash/
+
+# Python tooling and build products.
+.Python
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Editor, notebook, and local-service state.
+.idea/
+.vscode/
+.ipynb_checkpoints/
+.streamlit/secrets.toml
+*.log

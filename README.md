@@ -1,5 +1,7 @@
 # Problem Driven Research · 架构草案
 
+A resumable, problem-driven research workflow for evidence-aware literature discovery, domain protocols, source registries, and human-reviewed conclusions.
+
 此压缩包包含架构讨论稿与**首轮研究的可运行入口**。首轮流程能完成问题框架确认、公开资料检索和阶段性分析；实验执行及持续轮次仍待工程仓库和真实主题验证。
 
 ## 一键查看
