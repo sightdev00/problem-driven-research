@@ -33,7 +33,7 @@ export QWEN_API_KEY='已有服务要求的令牌'  # 无鉴权时省略
 
 如果从另一台机器访问服务器，请使用实际可达的地址。脚本不会把令牌写入研究记录。Windows PowerShell 用 `$env:QWEN_BASE_URL = 'http://.../v1'`、`$env:QWEN_MODEL = '...'` 设置变量；有鉴权时再设置 `$env:QWEN_API_KEY`。
 
-流程：录入原始现象和目标 → 模型提出竞争假设与 2–3 个互补检索词 → 人确认问题框架 → 检查题目补充网址（必查，但不是系统检索源）→ 按全局 [来源注册表](structure/sources.json) 读取领域机构页面，并查询 OpenAlex（单次 10 条，避免限流）与 Crossref（每个检索词各 10 条）；物理理论另查询 arXiv（主检索词 10 条预印本）→ 去重后读取至多五篇发现论文的公开落地页 → 模型分析来源 → 人确认阶段性记录。每个研究保存于 `research/<时间戳-编号>/`；中断后运行 `./research.sh resume`。需要补充同一研究时运行 `./research.sh refresh`：它会先将当前 `sources.json`、`analysis.json` 与已有报告归档到 `research/<编号>/rounds/<时间戳>/`，再重新检索和分析，绝不新建研究或覆盖旧轮证据。人工网址读取仅支持公开的 HTML 或纯文本；PDF 暂需提供人工提炼的原文材料。来源未读到或仅有论文摘要时，报告明确标注证据不足。
+流程：录入原始现象和目标 → 模型提出可判断的研究问题及 2–3 个互补检索词 → 人确认问题框架（物理领域必须明确具体分支 scope 和进展判据 progress_criterion；研究综述无须强造竞争因果假设）→ 检查题目补充网址（必查，但不是系统检索源）→ 按全局 [来源注册表](structure/sources.json) 读取领域机构页面，并查询 OpenAlex（单次 10 条，避免限流）与 Crossref（每个检索词各 10 条）；物理理论另查询 arXiv（主检索词 10 条预印本）→ 去重后读取至多五篇发现论文的公开落地页 → 模型分析来源 → 人确认阶段性资料线索。每个研究保存于 `research/<时间戳-编号>/`；中断后运行 `./research.sh resume`。需要补充同一研究时运行 `./research.sh refresh`：它会先将当前 `sources.json`、`analysis.json` 与已有报告归档到 `research/<编号>/rounds/<时间戳>/`，再重新检索和分析。已有研究的问题定义不合格时运行 `./research.sh reframe`：先归档现有分析，修改该研究的 `draft.json` 中的 `question`、`scope` 和 `progress_criterion`，然后 `./research.sh resume` 确认并重新检索。人工网址读取仅支持公开的 HTML 或纯文本；PDF 暂需提供人工提炼的原文材料。未读到的网页和访问验证页不能作证据；仅有论文摘要时，报告明确标注待全文核验。
 
 资料较多时，分析会按五条来源为一组逐批审查，完成的批次保存在 `analysis_chunks.json`；中断后 `resume` 会从已保存的批次继续，再进行最终综合。
 
