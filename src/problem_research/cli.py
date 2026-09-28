@@ -41,6 +41,7 @@ DOMAIN_PROTOCOLS = {
     "physics": {
         "version": "draft-1",
         "checks": "理论定义与适用范围、基本假设与对称性、数学推导或计算方法、近似与极限、可观测量或可检验后果、已有证据与反例、未解问题",
+        "output": "理论主张、适用条件、可检验预测与未解问题；没有工程目标时不生成工程结论",
     },
 }
 
@@ -201,7 +202,7 @@ def completion_json(content: str) -> dict:
     return result
 
 
-def model(prompt: str) -> dict:
+def model(prompt: str, domain: str = "visual-intelligence") -> dict:
     base = os.environ.get("QWEN_BASE_URL", "").strip().rstrip("/")
     name = os.environ.get("QWEN_MODEL", "").strip()
     if not base or not name:
@@ -216,7 +217,7 @@ def model(prompt: str) -> dict:
         "model": name,
         "temperature": 0.2,
         "messages": [
-            {"role": "system", "content": "你是视觉智能问题研究助手。只输出一个合法JSON对象，不要Markdown。区分原文事实与推断，不伪造证据。"},
+            {"role": "system", "content": f"你是{domain}领域的问题研究助手。只输出一个合法JSON对象，不要Markdown。区分原文事实与推断，不伪造证据。"},
             {"role": "user", "content": prompt},
         ],
     }, headers, timeout=MODEL_TIMEOUT_SECONDS)
@@ -415,7 +416,7 @@ def unique_readable_sources(sources: list[dict]) -> list[dict]:
     output = []
     seen = set()
     for source in sources:
-        if not source.get("text"):
+        if not source_is_readable(source):
             continue
         key = str(source.get("url") or source.get("id") or "").strip().casefold()
         if key in seen:
@@ -423,6 +424,27 @@ def unique_readable_sources(sources: list[dict]) -> list[dict]:
         seen.add(key)
         output.append(source)
     return output
+
+
+def source_is_readable(source: dict) -> bool:
+    """A successful HTTP response can still be an access challenge, not evidence."""
+    content = str(source.get("text") or "").strip()
+    if not content or str(source.get("kind", "")).endswith("_unread"):
+        return False
+    challenge = ("just a moment", "checking your browser", "verify you are human",
+                 "enable javascript and cookies", "access denied", "captcha")
+    return not any(marker in content.casefold() for marker in challenge)
+
+
+def check_frame(draft: dict, problem: dict) -> None:
+    question = str(draft.get("question") or "").strip()
+    if not question or question == str(problem.get("title") or "").strip():
+        raise ValueError("研究问题仍是原始题目；请在 draft.json 中明确一个可判断的问题。")
+    if not isinstance(draft.get("hypotheses"), list):
+        raise ValueError("模型的问题框架不完整，未进入自动搜索。")
+    if problem.get("domain") == "physics":
+        if not str(draft.get("scope") or "").strip() or not str(draft.get("progress_criterion") or "").strip():
+            raise ValueError("物理领域须在 draft.json 写明 scope（具体分支及边界）和 progress_criterion（进展判据）后才能检索。")
 
 
 def start() -> Path:
@@ -504,13 +526,19 @@ def frame(path: Path, problem: dict) -> bool:
         draft = model("按该领域的“" + protocol["checks"] + "”检查下面的线索。"
                       "返回字段 question（可操作化的研究问题，字符串）、observations（已知事实数组）、"
                       "hypotheses（至少三个竞争假设的数组，每项含 name/prediction）、"
-                      "unknowns（待核查数组）、search_query（一个英文短检索词组）、search_queries（2到3个互补英文短检索词组）。保留未知和多因素作用，不把观察直接当因果。\n"
-                      + json.dumps(problem, ensure_ascii=False))
-        if not isinstance(draft.get("hypotheses"), list) or not draft.get("question"):
-            raise ValueError("模型的问题框架不完整，未进入自动搜索。")
+                      "unknowns（待核查数组）、scope（具体分支和排除范围）、progress_criterion（什么结果才算进展）、"
+                      "search_query（一个英文短检索词组）、search_queries（2到3个互补英文短检索词组）。"
+                      "主题太宽时只选一个可检验的子问题，供人确认；综述方向不是竞争因果假设，不能强造竞争假设。\n"
+                      + json.dumps(problem, ensure_ascii=False), problem["domain"])
         save_json(draft_path, draft)
     else:
         draft = load_json(draft_path)
+    try:
+        check_frame(draft, problem)
+    except ValueError as exc:
+        stage(path, "awaiting_problem_review")
+        print(f"问题定义待补充：{exc}\n请修改 {draft_path} 后运行 ./research.sh resume。")
+        return False
     print("\n问题框架（模型建议，尚未确认）：\n" + json.dumps(draft, ensure_ascii=False, indent=2))
     if not approved("确认此问题框架，允许公开资料检索？"):
         stage(path, "awaiting_problem_review")
@@ -602,7 +630,7 @@ def analysis(path: Path, problem: dict, sources: list[dict]) -> None:
                        "不得声称完成本地实验。返回 findings（每项含 source_id/claim/limits/relation）、"
                        "mechanism_leads（待验证机制线索数组）、counterpoints（反例或替代解释数组）、"
                        "human_needed（需人工提供的内容数组）、open_questions（数组）。无证据时用空数组。\n"
-                       + json.dumps({"problem": problem, "frame": draft, "sources": batch}, ensure_ascii=False))
+                       + json.dumps({"problem": problem, "frame": draft, "sources": batch}, ensure_ascii=False), problem["domain"])
         findings = review.get("findings", [])
         if not isinstance(findings, list):
             raise ValueError("模型没有返回可校验的分块发现列表。")
@@ -614,10 +642,11 @@ def analysis(path: Path, problem: dict, sources: list[dict]) -> None:
                    "摘要不是全文，不能声称完成论文验证；不得声称完成本地实验。返回字段："
                    "findings（数组，每项含 source_id/claim/limits/relation）、"
                    "mechanism_conclusions（机制性结论或待验证线索数组）、"
-                   "engineering_conclusions（当前工程结论或待验证建议数组）、"
+                   "engineering_conclusions（仅有工程目标时填写，否则空数组）、"
                    "counterpoints（反例/替代解释数组）、next_question（最相关的下一子问题字符串）、"
-                   "human_needed（需人提供的数据或判断数组）。结果无法支持结论时用空数组。\n"
-                   + json.dumps({"problem": problem, "frame": draft, "source_reviews": chunks}, ensure_ascii=False))
+                   "human_needed（至多两项确实无法自动取得的人工输入）。聚焦至多六条与当前问题最相关的发现；"
+                   "标注正文、摘要或机构新闻，不能以来源ID存在代替主张核验。结果无法支持结论时用空数组。\n"
+                   + json.dumps({"problem": problem, "frame": draft, "source_reviews": chunks}, ensure_ascii=False), problem["domain"])
     known = {s["id"] for s in source_input}
     findings = result.get("findings", [])
     if not isinstance(findings, list):
@@ -625,7 +654,10 @@ def analysis(path: Path, problem: dict, sources: list[dict]) -> None:
     verified = [entry for entry in findings if isinstance(entry, dict) and entry.get("source_id") in known]
     if len(verified) < len(findings):
         print("已排除引用不存在来源的模型主张。")
-    result["findings"] = verified
+    result["findings"] = verified[:6]
+    if problem.get("domain") == "physics" and not problem.get("engineering_goal"):
+        result["engineering_conclusions"] = []
+    result["human_needed"] = (result.get("human_needed") or [])[:2]
     save_json(path / "analysis.json", result)
     print("\n阶段性分析：\n" + json.dumps(result, ensure_ascii=False, indent=2))
     if not approved("将这轮阶段性分析写入研究记录？"):
@@ -635,24 +667,28 @@ def analysis(path: Path, problem: dict, sources: list[dict]) -> None:
     write_report(path, problem, draft, sources, result)
     stage(path, "awaiting_next_round")
     print("\n研究记录：" + str(path / "reports" / "current.md"))
-    print("下一步如需本地实验：人提供真实素材和现有工程仓库的能力说明后再设计可执行脚本。")
+    if problem.get("domain") != "physics":
+        print("下一步如需本地实验：人提供真实素材和现有工程仓库的能力说明后再设计可执行脚本。")
 
 
 def write_report(path: Path, problem: dict, draft: dict, sources: list[dict], result: dict) -> None:
     reports = path / "reports"
     reports.mkdir(exist_ok=True)
-    lines = ["# 当前研究结论（第一轮，待原文与本地实验验证）", "", f"研究目标：{problem['goal']}",
+    lines = ["# 阶段性资料线索（待原文核验）", "", f"研究目标：{problem['goal']}",
              f"原始现象：{problem['observation']}", f"当前问题：{draft['question']}", "", "## 资料与发现", ""]
     for item in result.get("findings", []):
         source = next(s for s in sources if s["id"] == item["source_id"])
-        lines.append(f"- [{item['source_id']}] {item.get('claim', '')}；限制：{item.get('limits', '')}。来源：{source['url']}")
-    for title, field in [("机制性判断", "mechanism_conclusions"), ("工程判断", "engineering_conclusions"),
-                         ("反例与替代解释", "counterpoints"), ("需要人工提供", "human_needed")]:
+        lines.append(f"- [{item['source_id']}] {item.get('claim', '')}；来源类型：{source.get('kind', '未知')}；限制：{item.get('limits', '')}。来源：{source['url']}")
+    sections = [("机制线索", "mechanism_conclusions"), ("反例与替代解释", "counterpoints"),
+                ("需要人工提供", "human_needed")]
+    if problem.get("domain") != "physics" or problem.get("engineering_goal"):
+        sections.insert(1, ("工程判断", "engineering_conclusions"))
+    for title, field in sections:
         lines.extend(["", "## " + title, ""])
         for value in result.get(field, []):
             lines.append("- " + str(value))
     lines.extend(["", "## 下一子问题", "", str(result.get("next_question", "待人工决定")), "",
-                  "说明：本轮可能只读取论文摘要或部分网页；本地工程结论尚须实验证实。", ""])
+                  "说明：本轮可能只读取论文摘要或部分网页；以上仅为待核验线索，不能视为已证实结论。", ""])
     (reports / "current.md").write_text("\n".join(lines), encoding="utf-8")
     with (reports / "history.md").open("a", encoding="utf-8") as handle:
         handle.write(f"\n## {now()} · 首轮研究\n\n确认问题框架；检索 {len(sources)} 条候选来源；"
@@ -692,13 +728,21 @@ def main() -> int:
     RESEARCH.mkdir(exist_ok=True)
     args = sys.argv[1:]
     if args and args[0] in {"-h", "--help"}:
-        print("用法: ./research.sh [new|resume|retry-sources|refresh|delete]；默认显示交互菜单。")
+        print("用法: ./research.sh [new|resume|retry-sources|refresh|reframe|delete]；默认显示交互菜单。")
         return 0
     action = args[0] if args else ask("启动研究 [new] / 继续研究 [resume]：", required=False) or "new"
     if action == "new":
         path = start()
-    elif action in {"resume", "retry-sources", "refresh", "next-round"}:
+    elif action in {"resume", "retry-sources", "refresh", "next-round", "reframe"}:
         path = choose()
+        if action == "reframe":
+            if load_json(path / "progress.json")["stage"] not in {"analysis", "awaiting_analysis_review", "awaiting_next_round", "awaiting_sources"}:
+                raise RuntimeError("当前研究尚未完成问题确认，直接编辑 draft.json 后 resume 即可。")
+            archive = archive_round(path)
+            append_jsonl(path / "decisions.jsonl", {"at": now(), "type": "problem_reframing", "archive": str(archive.relative_to(path))})
+            stage(path, "awaiting_problem_review")
+            print("历史分析已归档；请先修改 " + str(path / "draft.json") + "，明确 question、scope、progress_criterion，然后 ./research.sh resume。")
+            return 0
         if action == "retry-sources":
             if load_json(path / "progress.json")["stage"] != "awaiting_sources":
                 raise RuntimeError("只能对等待来源的研究重新检索。")
@@ -722,7 +766,7 @@ def main() -> int:
         print("已移入可恢复回收目录：" + str(target))
         return 0
     else:
-        raise ValueError("只支持 new、resume、retry-sources。")
+        raise ValueError("只支持 new、resume、retry-sources、refresh、reframe、delete。")
     run(path)
     return 0
 
