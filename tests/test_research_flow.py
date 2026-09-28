@@ -89,6 +89,26 @@ class ResearchFlowTest(unittest.TestCase):
                    {"id": "P1", "url": "https://doi.org/test", "text": "Abstract"}]
         self.assertEqual([item["id"] for item in cli.unique_readable_sources(sources)], ["G1", "P1"])
 
+    def test_access_challenge_is_not_evidence(self):
+        sources = [{"id": "W1", "url": "https://example.org/a", "text": "Just a moment... Checking your browser"},
+                   {"id": "H1", "url": "https://example.org/b", "text": "A readable article"}]
+        self.assertEqual([s["id"] for s in cli.unique_readable_sources(sources)], ["H1"])
+
+    def test_physics_question_requires_scope_and_progress_criterion(self):
+        problem = {"title": "全息理论的进展", "domain": "physics"}
+        with self.assertRaisesRegex(ValueError, "scope"):
+            cli.check_frame({"question": "黑洞信息领域出现了什么进展？", "hypotheses": []}, problem)
+        cli.check_frame({"question": "近年黑洞信息研究解决了哪些具体问题？", "hypotheses": [],
+                         "scope": "黑洞信息与 AdS/CFT", "progress_criterion": "可复现的推导及边界"}, problem)
+
+    def test_physics_model_system_prompt_uses_domain(self):
+        response = {"choices": [{"message": {"content": "{}"}}]}
+        with patch.dict("os.environ", {"QWEN_BASE_URL": "https://model.example/v1", "QWEN_MODEL": "qwen"}), \
+             patch.object(cli, "http_json", return_value=response) as http:
+            cli.model("test", "physics")
+        self.assertIn("physics", http.call_args.args[1]["messages"][0]["content"])
+        self.assertNotIn("视觉智能", http.call_args.args[1]["messages"][0]["content"])
+
     def test_arxiv_search_parses_atom_preprint_abstract(self):
         atom = '''<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>http://arxiv.org/abs/1234.5678</id>
         <title> Holography </title><published>2026-01-02T00:00:00Z</published><summary> A summary. </summary>
